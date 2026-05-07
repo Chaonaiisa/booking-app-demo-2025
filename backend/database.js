@@ -21,7 +21,7 @@ async function initDatabase() {
   try {
     runMigrations();
     await db.$connect();
-    console.log('เชื่อมต่อฐานข้อมูล PostgreSQL สำเร็จ');
+    console.log('เชื่อมต่อฐานข้อมูลสำเร็จ');
 
     const adminPassword = await bcrypt.hash('admin123', 10);
     await db.user.upsert({
