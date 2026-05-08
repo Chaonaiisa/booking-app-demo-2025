@@ -45,3 +45,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Start the application with entrypoint script
 ENTRYPOINT ["./docker-entrypoint.sh"]
 #CMD ["npm", "start"]
+COPY docker-entrypoint.sh ./
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh   # ← เพิ่มบรรทัดนี้
+RUN chmod +x ./docker-entrypoint.sh

@@ -1,22 +1,86 @@
 const express = require('express');
+const helmet = require('helmet');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
-
+const rateLimit = require('express-rate-limit');
 const app = express();
-const PORT = 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET;
 const REPORT_DIR = path.join(__dirname, 'reports');
+
+// ── 1. Environment Validation ─────────────────
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+requiredEnvVars.forEach(envVar => {
+  if (!process.env[envVar]) {
+    console.error(`❌ Missing required env var: ${envVar}`);
+    process.exit(1);
+  }
+});
+
 if (!fs.existsSync(REPORT_DIR)) {
   fs.mkdirSync(REPORT_DIR, { recursive: true });
 }
 
-app.use(cors());
-app.use(express.json());
+// ── 2. Security Headers (Helmet) ─────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
+  frameguard: { action: 'deny' },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+  },
+}));
 
+// ── 3. CORS Configuration ─────────────────────
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.includes(origin)) {
+    return next();
+  }
+  return res.status(403).json({ error: `CORS: ${origin} not allowed` });
+});
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200,
+}));
+
+// ── 4. Rate Limiting ──────────────────────────
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again in 1 hour.' },
+});
+
+app.use('/api', generalLimiter);
+app.use('/api/login', loginLimiter);
+
+// ── 5. Body Parser ────────────────────────────
+app.use(express.json({ limit: '10kb' }));
 const STATUS_VALUES = ['pending', 'confirmed', 'cancelled', 'completed'];
 
 const authenticateToken = (req, res, next) => {
@@ -396,4 +460,16 @@ app.get('/api/reports/export', authenticateToken, async (req, res) => {
   }
 });
 
+// ── 6. Error Handling ─────────────────────────
+app.use((err, req, res, next) => {
+  if (err && err.message && err.message.startsWith('CORS:')) {
+    return res.status(403).json({ error: err.message });
+  }
+  if (err) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+  next();
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Pipeline test Thu, May  7, 2026  9:55:42 PM
