@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "api-test": "newman run tests/booking-api.postman_collection.json"
+  },
   "devDependencies": {
     "newman": "^6.2.2",
     "newman-reporter-htmlextra": "^1.23.1"
