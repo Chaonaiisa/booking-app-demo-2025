@@ -17,6 +17,21 @@ if (!fs.existsSync(REPORT_DIR)) {
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({
+    name: 'booking-app-demo-2025 API',
+    status: 'running',
+    message: 'Backend API is running successfully',
+    endpoints: [
+      '/api/login',
+      '/api/rooms',
+      '/api/bookings',
+      '/api/reports',
+      '/api/reports/export'
+    ]
+  });
+});
+
 const STATUS_VALUES = ['pending', 'confirmed', 'cancelled', 'completed'];
 
 const authenticateToken = (req, res, next) => {
